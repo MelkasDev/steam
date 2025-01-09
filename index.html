@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Game Monitor</title>
+</head>
+<body>
+    <h1>Steam Game Monitor</h1>
+    <p>Monitorowanie gier z tagiem <strong>Psychological Horror</strong>...</p>
+    <div id="status">Status: Oczekiwanie...</div>
+
+    <script>
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1326952063044681799/YP3XRwDMnwInw5Q2IdTGifKDK2FSEpSHI8IZuEbY_MK76QXhizZhNU2NN4C5HSUlRchF";
+
+        async function fetchGames() {
+            try {
+                const response = await fetch("https://store.steampowered.com/tags/en/Psychological%20Horror/");
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, "text/html");
+
+                const games = Array.from(doc.querySelectorAll(".tab_item .tab_item_name")).map(el => el.textContent.trim());
+                return games;
+            } catch (error) {
+                console.error("Błąd podczas pobierania gier:", error);
+                document.getElementById("status").innerText = "Status: Nie udało się pobrać gier.";
+                return [];
+            }
+        }
+
+        async function sendToDiscord(newGames) {
+            try {
+                const content = {
+                    content: `🎮 Nowe gry Psychological Horror na Steamie:\n\n${newGames.map(game => `- ${game}`).join("\n")}`
+                };
+                const response = await fetch(DISCORD_WEBHOOK_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(content),
+                });
+
+                if (response.ok) {
+                    console.log("Powiadomienie wysłane na Discord!");
+                    document.getElementById("status").innerText = "Status: Powiadomienie wysłane!";
+                } else {
+                    console.error("Błąd podczas wysyłania powiadomienia:", response.status, response.statusText);
+                    document.getElementById("status").innerText = "Status: Błąd podczas wysyłania powiadomienia.";
+                }
+            } catch (error) {
+                console.error("Błąd podczas komunikacji z Discordem:", error);
+                document.getElementById("status").innerText = "Status: Błąd podczas komunikacji z Discordem.";
+            }
+        }
+
+        async function monitorGames() {
+            const currentGames = await fetchGames();
+            console.log("Rozpoczynam monitorowanie gier...");
+            document.getElementById("status").innerText = "Status: Monitorowanie rozpoczęte.";
+
+            setInterval(async () => {
+                const newGames = (await fetchGames()).filter(game => !currentGames.includes(game));
+                if (newGames.length > 0) {
+                    console.log("Znaleziono nowe gry:", newGames);
+                    sendToDiscord(newGames);
+                    currentGames.push(...newGames);
+                }
+            }, 60000); // Sprawdzaj co 1 minutę
+        }
+
+        monitorGames();
+    </script>
+</body>
+</html>
